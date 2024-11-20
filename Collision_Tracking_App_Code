@@ -1,0 +1,236 @@
+import java.awt.*;
+import java.sql.*;
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableColumn;
+
+public class CollisionTrackingApp {
+    private static final String URL = "jdbc:mysql://localhost:3306/space";  // Replace with your DB name
+    private static final String USER = "root";  // Replace with your MySQL username
+    private static final String PASS = "darshan";  // Replace with your MySQL password
+
+    private final JTable table;
+    private final DefaultTableModel model;
+    private final JTextField riskFilterField;
+    private final TableColumn collisionRiskColumn; // Reference to the Collision Risk column
+    private boolean isCollisionRiskVisible = false; // Track visibility of the column
+
+    public CollisionTrackingApp() {
+        JFrame frame = new JFrame("Collision Tracking App");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(1000, 700);
+        frame.getContentPane().setBackground(new Color(240, 248, 255));
+
+        String[] columnNames = {"ID", "Size", "Speed", "Orbit", "Collision Risk"};
+        model = new DefaultTableModel(columnNames, 0);
+        table = new JTable(model);
+        table.setRowHeight(30);
+        table.setFont(new Font("Arial", Font.PLAIN, 14));
+        table.getTableHeader().setFont(new Font("Arial", Font.BOLD, 16));
+        table.getTableHeader().setBackground(new Color(173, 216, 230));
+
+        // Set up the table and collision risk column reference
+        collisionRiskColumn = table.getColumnModel().getColumn(4);
+
+        JScrollPane scrollPane = new JScrollPane(table);
+        scrollPane.setBorder(BorderFactory.createTitledBorder("Space Debris Data"));
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setBackground(new Color(240, 248, 255));  // Background color for the button panel
+        setupButtonPanel(buttonPanel);  // Setup buttons
+
+        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        filterPanel.setBackground(new Color(240, 248, 255));
+        JLabel filterLabel = new JLabel("Collision Risk Filter:");
+        riskFilterField = new JTextField(5);
+        filterPanel.add(filterLabel);
+        filterPanel.add(riskFilterField);
+
+        frame.add(scrollPane, BorderLayout.CENTER);
+        frame.add(buttonPanel, BorderLayout.SOUTH);
+        frame.add(filterPanel, BorderLayout.NORTH);
+
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+
+        hideCollisionRiskColumn(); // Initially hide the Collision Risk column
+    }
+
+    private void hideCollisionRiskColumn() {
+        collisionRiskColumn.setMinWidth(0);
+        collisionRiskColumn.setMaxWidth(0);
+        collisionRiskColumn.setPreferredWidth(0);
+        isCollisionRiskVisible = false;
+    }
+
+    private void showCollisionRiskColumn() {
+        collisionRiskColumn.setMinWidth(75); // Set the minimum width of the column
+        collisionRiskColumn.setMaxWidth(200); // Set the maximum width of the column
+        collisionRiskColumn.setPreferredWidth(100); // Set the preferred width of the column
+        isCollisionRiskVisible = true;
+    }
+
+    private JButton createStyledButton(String text, Color color) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Arial", Font.BOLD, 14));
+        button.setBackground(color);
+        button.setForeground(Color.BLACK);  // Text color set to black
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));  // Border around button
+        button.setPreferredSize(new Dimension(120, 40));  // Size for better visual appeal
+        button.setMargin(new Insets(10, 20, 10, 20));  // Padding for spacing
+        return button;
+    }
+
+    private void setupButtonPanel(JPanel buttonPanel) {
+        buttonPanel.setLayout(new FlowLayout(FlowLayout.CENTER, 20, 10));  // Spaced-out layout with centered alignment
+
+        // Create buttons
+        JButton loadButton = createStyledButton("Load Data", new Color(100, 149, 237));
+        JButton analyzeButton = createStyledButton("Analyze", new Color(255, 160, 122));
+        JButton resetButton = createStyledButton("Reset", new Color(255, 99, 71));
+        JButton filterButton = createStyledButton("Filter", new Color(144, 238, 144));
+        JButton addButton = createStyledButton("Add", new Color(60, 179, 113));
+        JButton deleteButton = createStyledButton("Delete", new Color(220, 20, 60));
+        JButton updateButton = createStyledButton("Update", new Color(255, 140, 0));
+
+        // Add action listeners
+        loadButton.addActionListener(e -> loadData());
+        analyzeButton.addActionListener(e -> analyzeCollisionRisk());
+        resetButton.addActionListener(e -> resetTable());
+        filterButton.addActionListener(e -> filterByCollisionRisk());
+        addButton.addActionListener(e -> addData());
+        deleteButton.addActionListener(e -> deleteData());
+        updateButton.addActionListener(e -> updateData());
+
+        // Add buttons to the panel
+        buttonPanel.add(loadButton);
+        buttonPanel.add(analyzeButton);
+        buttonPanel.add(resetButton);
+        buttonPanel.add(filterButton);
+        buttonPanel.add(addButton);
+        buttonPanel.add(deleteButton);
+        buttonPanel.add(updateButton);
+    }
+
+    private void loadData() {
+        model.setRowCount(0);
+        String query = "SELECT debris_id, debris_size, debris_speed, debris_orbit, collision_risk FROM SpaceDebris";
+
+        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
+            while (rs.next()) {
+                int debrisId = rs.getInt("debris_id");
+                float size = rs.getFloat("debris_size");
+                float speed = rs.getFloat("debris_speed");
+                String orbit = rs.getString("debris_orbit");
+                float collisionRisk = rs.getFloat("collision_risk");
+
+                model.addRow(new Object[]{debrisId, size, speed, orbit, collisionRisk});
+            }
+
+            hideCollisionRiskColumn(); // Ensure column is hidden after loading data
+
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(null, "Database error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void analyzeCollisionRisk() {
+        if (isCollisionRiskVisible) {
+            JOptionPane.showMessageDialog(null, "Collision Risk is already visible!", "Info", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        showCollisionRiskColumn(); // Reveal the Collision Risk column
+    }
+
+    private void resetTable() {
+        model.setRowCount(0);
+        hideCollisionRiskColumn();  // Ensure "Collision Risk" column is hidden on reset
+    }
+
+    private void filterByCollisionRisk() {
+        String riskThresholdStr = riskFilterField.getText();
+        if (!riskThresholdStr.isEmpty()) {
+            try {
+                float riskThreshold = Float.parseFloat(riskThresholdStr);
+                for (int i = 0; i < model.getRowCount(); i++) {
+                    float collisionRisk = (float) model.getValueAt(i, 4);
+                    if (collisionRisk < riskThreshold) {
+                        model.removeRow(i);
+                        i--; // Adjust index after removal
+                    }
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(null, "Invalid collision risk filter value.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    private void addData() {
+        String debrisIdStr = JOptionPane.showInputDialog("Enter Debris ID:");
+        String sizeStr = JOptionPane.showInputDialog("Enter Debris Size:");
+        String speedStr = JOptionPane.showInputDialog("Enter Debris Speed:");
+        String orbitStr = JOptionPane.showInputDialog("Enter Debris Orbit:");
+
+        try {
+            int debrisId = Integer.parseInt(debrisIdStr);
+            float size = Float.parseFloat(sizeStr);
+            float speed = Float.parseFloat(speedStr);
+            String orbit = orbitStr;
+
+            // Assuming collision risk is computed and returned (for now set to 0)
+            float collisionRisk = 0;
+
+            model.addRow(new Object[]{debrisId, size, speed, orbit, collisionRisk});
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(null, "Invalid data format.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void deleteData() {
+        int selectedRow = table.getSelectedRow();
+        if (selectedRow != -1) {
+            model.removeRow(selectedRow);
+        } else {
+            JOptionPane.showMessageDialog(null, "Please select a row to delete.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void updateData() {
+        int selectedRow = table.getSelectedRow();
+        if (selectedRow != -1) {
+            String debrisIdStr = JOptionPane.showInputDialog("Enter new Debris ID:");
+            String sizeStr = JOptionPane.showInputDialog("Enter new Debris Size:");
+            String speedStr = JOptionPane.showInputDialog("Enter new Debris Speed:");
+            String orbitStr = JOptionPane.showInputDialog("Enter new Debris Orbit:");
+
+            try {
+                int debrisId = Integer.parseInt(debrisIdStr);
+                float size = Float.parseFloat(sizeStr);
+                float speed = Float.parseFloat(speedStr);
+                String orbit = orbitStr;
+
+                model.setValueAt(debrisId, selectedRow, 0);
+                model.setValueAt(size, selectedRow, 1);
+                model.setValueAt(speed, selectedRow, 2);
+                model.setValueAt(orbit, selectedRow, 3);
+
+                // Assuming collision risk update logic goes here (for now set to 0)
+                model.setValueAt(0, selectedRow, 4);
+
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(null, "Invalid data format.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        } else {
+            JOptionPane.showMessageDialog(null, "Please select a row to update.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new CollisionTrackingApp());
+    }
+}
